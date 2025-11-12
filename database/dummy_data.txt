@@ -1,0 +1,104 @@
+-- Script de referencia para reiniciar tablas críticas y cargar datos de demostración
+-- Ejecuta este archivo en tu instancia de MySQL antes de iniciar la aplicación
+
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE audit_log;
+TRUNCATE TABLE publications;
+TRUNCATE TABLE users;
+TRUNCATE TABLE roles;
+TRUNCATE TABLE customers;
+TRUNCATE TABLE products;
+TRUNCATE TABLE categories;
+TRUNCATE TABLE vendors;
+TRUNCATE TABLE branches;
+TRUNCATE TABLE addresses;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- Roles con diferentes privilegios para probar el control de acceso
+INSERT INTO roles (id, code, name, can_create, can_update, can_delete, can_export, can_manage_triggers)
+VALUES
+  (1, 'admin', 'Administrador', 1, 1, 1, 1, 1),
+  (2, 'editor', 'Editor de Contenido', 1, 1, 0, 1, 0),
+  (3, 'viewer', 'Analista', 0, 0, 0, 0, 0);
+
+-- Usuarios de prueba (contraseña en texto plano solo para demos)
+INSERT INTO users (id, role_id, full_name, email, password_hash)
+VALUES
+  (1, 1, 'Ana Directora', 'ana@doce.com', 'admin123'),
+  (2, 2, 'Carlos Creativo', 'carlos@doce.com', 'editor123'),
+  (3, 3, 'Valentina Viewer', 'valentina@doce.com', 'viewer123');
+
+-- Direcciones y sucursales
+INSERT INTO addresses (id, line1, city, country)
+VALUES
+  (1, 'Calle 123 #45-67', 'Bogotá', 'CO'),
+  (2, 'Av. Las Palmas 56', 'Medellín', 'CO');
+
+INSERT INTO branches (id, code, name, phone, email, address_id)
+VALUES
+  (1, 'BOG', 'Oficina Bogotá', '+57 1234567', 'bogota@doce.com', 1),
+  (2, 'MED', 'Oficina Medellín', '+57 7654321', 'medellin@doce.com', 2);
+
+-- Categorías y proveedores para los productos de referencia
+INSERT INTO categories (id, slug, name)
+VALUES
+  (1, 'skincare', 'Skincare'),
+  (2, 'makeup', 'Maquillaje');
+
+INSERT INTO vendors (id, name, email)
+VALUES
+  (1, 'Glow Labs', 'contacto@glowlabs.com'),
+  (2, 'Trendy Makeup', 'ventas@trendymakeup.com');
+
+-- Productos de ejemplo
+INSERT INTO products (id, vendor_id, category_id, sku, name, price, cost, status)
+VALUES
+  (1, 1, 1, 'GL-001', 'Sérum Iluminador', 89000, 45000, 'active'),
+  (2, 2, 2, 'TM-101', 'Paleta Urbana', 129000, 65000, 'active');
+
+-- Clientes para probar los endpoints CRUD
+INSERT INTO customers (id, full_name, email, phone, document_id)
+VALUES
+  (1, 'Mariana Torres', 'mariana@example.com', '+57 3001234567', 'CC123456'),
+  (2, 'Julián Pérez', 'julian@example.com', '+57 3019876543', 'CC987654');
+
+-- Publicaciones iniciales
+INSERT INTO publications (publication_id, content, image_url, total_likes, total_comments, total_shares)
+VALUES
+  (1, 'Tips de skincare para días soleados ☀️', 'https://cdn.example.com/img/skincare.jpg', 540, 62, 45),
+  (2, 'Nuevo tutorial de maquillaje morado 💜', 'https://cdn.example.com/img/makeup.jpg', 820, 105, 72);
+
+-- Trigger que registra automáticamente las actualizaciones realizadas sobre publicaciones
+DROP TRIGGER IF EXISTS trg_publications_update_audit;
+DELIMITER $$
+CREATE TRIGGER trg_publications_update_audit
+AFTER UPDATE ON publications
+FOR EACH ROW
+BEGIN
+  INSERT INTO audit_log (actor_user_id, entity, entity_id, action, details)
+  VALUES (
+    IFNULL(@audit_actor_id, NULL),
+    'publication',
+    NEW.publication_id,
+    'update',
+    JSON_OBJECT(
+      'before', JSON_OBJECT(
+        'content', OLD.content,
+        'total_likes', OLD.total_likes,
+        'total_comments', OLD.total_comments,
+        'total_shares', OLD.total_shares
+      ),
+      'after', JSON_OBJECT(
+        'content', NEW.content,
+        'total_likes', NEW.total_likes,
+        'total_comments', NEW.total_comments,
+        'total_shares', NEW.total_shares
+      )
+    )
+  );
+END$$
+DELIMITER ;
+
+-- Registro de auditoría inicial para no dejar la tabla vacía
+INSERT INTO audit_log (actor_user_id, entity, entity_id, action, details)
+VALUES (1, 'seed', 0, 'seed', JSON_OBJECT('note', 'Datos dummy cargados'));

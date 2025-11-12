@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import './animations.css';
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-dark text-white;
+}
+
+.scrollbar-purple::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-purple::-webkit-scrollbar-track {
+  @apply bg-dark;
+}
+
+.scrollbar-purple::-webkit-scrollbar-thumb {
+  @apply bg-primary rounded-full;
+}
